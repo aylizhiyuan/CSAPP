@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2020-11-21 20:53:10
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2020-12-04 14:37:34
+ * @LastEditTime: 2020-12-10 23:33:23
 -->
 # 操作系统
 
@@ -56,7 +56,10 @@ CPU会在每条指令执行周期的最后时刻扫描中断寄存器,查看是�
 
 - 中断函数处理完毕后,CPU检测到中断返回指令,CPU从内核态转为用户态,恢复之前的上下文
 
+```
+用户调用printf -----> printf展开为int 0x80 -----> 中断处理程序 system_call ----> 查表 sys_call_table ------> __NR_write -----> sys_write 调用
 
+```
 
 ## 进程
 
@@ -75,13 +78,53 @@ CPU会在每条指令执行周期的最后时刻扫描中断寄存器,查看是�
 
 ![](./image/runtime.png)
 
-## 线程
+> 进程进行系统调用并不一定都是阻塞的(无需等待外部事件发生),阻塞的原则是需要等待硬件设备的操作.....
 
-为什么需要线程
+多进程的CPU图像
 
-- 多线程之间会共享同一块地址空间和所有可用数据的能力,这是进程不具备的
-- 线程要比进程`更轻量级`,由于线程更轻,所以它比进程更容易创建,也容易撤销
-- 性能方面,拥有多个线程能在这些活动中彼此重叠进行,大量的计算和大量IO处理速度更快
+1. 进程时间轮片用完
+2. 当前进程阻塞
+
+```
+// 调度
+schedule(){
+    // 找出就绪进程队列中的下一个
+    pNew = getNext(ReadyQueue)
+    // 进行切换
+    switch_to(pCur,pNew); 
+}
+
+// 切换
+switch_to(pCur,pNew){
+    pCur.ax = CPU.ax;
+    pCur.bx = CPU.bx;
+    .....
+    pCur.cs = CPU.cs;
+    pCur.retpc = CPU.pc;
+
+    CPU.ax = pNew.ax;
+    CPU.bx = pNew.bx;
+    CPU.cs = pNew.cs;
+    CPU.retpc = pNew.pc;
+}
+```
+
+## 用户级线程
+
+## 内核级线程
+
+
+## CPU调度
+
+## 进程同步与信号量
+
+## 死锁处理
+
+## 内存使用与分段
+
+
+
+
 
 
 
