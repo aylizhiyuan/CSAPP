@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2020-11-21 20:53:10
  * @LastEditors: lizhiyuan
- * @LastEditTime: 2021-01-14 11:08:54
+ * @LastEditTime: 2021-01-19 17:47:03
 -->
 # 操作系统
 
@@ -182,19 +182,161 @@ CPU常常说的8核16个线程，指的就是CPU并行的能力,同时可以执�
 
 但是底层都是通过clone()
 
+有阻塞的系统调用 
+
+```
+// 用户态
+main(){
+    A();
+}
+A(){
+    B();
+}
+B(){
+    read(); // int 0x80进入内核
+}
+
+// 内核态
+system_call:
+        call sys_read();
+
+sys_read(){
+    
+}
+```
+
+总结: 这里,其实要明白的就是阻塞的系统调用,要从用户栈 ---> 内核栈 ---> 中断处理函数(阻塞IO) ----> schedule(CPU切换不同的内核栈完成进程之间的切换...A,B,C,D)
+
+这时候DMA负责去控制硬盘,从硬盘(网卡)中将数据读出来,因为数据不会保留,所以要快速的处理这些数据,硬件发出硬中断告诉CPU要快速的处理,CPU响应硬中断,内核栈中的中断处理函数拿到返回的结果数据,内核栈结束工作后iret回用户栈,继续执行用户栈下的指令...
 
 
+无阻塞的系统调用
 
+```
+// 用户态
+main(){
+    A();
+    B();
+}
+A(){
+    fork(); // fork是系统调用,会引起中断
+    // 其实你可以理解为所有的进程都是操作系统Fork出来的,而线程跟进程并没有本质的区别
+    // move %eax,__NR_fork
+    // INT 0x80 // 中断
+    // move res,%eax // 结果保存
+}
 
+// 内核态
+system_call:
+    // 把用户态的寄存器的值压入栈 ,保留现场
+    push %ds..%fs;
+    push %edx....;
+    call sys_fork(); // 中断处理函数
+    iret; // 这里处理完毕后,返回用户态
 
+_sys_fork:
+    call copy process
+    ret; // 这里会返回system_call
 
+// copy_process的创建细节
 
+p = (struct task_struct *)get_free_page(); // 获得一页的内存
 
+p->tss.esp0 = PAGE_SIZE + (long) p;
+p->tss.ss0 = 0x10;
+// 创建内核栈
 
+p->tss.ss = ss & 0xffff;
+p->tss.esp = esp;
+// 创建用户栈(和父进程共用栈)
+```
 
+大致上的流程是这样的:copy process会首先创建一个新的内核栈,将父进程的内核栈复制一份,赋值给子进程.用户栈都是同一个栈
+
+由于fork是非阻塞的,所以,当代码执行完毕的时候,时间片调度到子进程的时候,子进程的代码开始执行,父子进程执行顺序是不确定的....
 
 
 ## CPU调度
+
+从用户代码开始
+```
+main(){
+    if(!fork()){while(1)printf("A")};
+    if(!fork()){while(1)printf("B")};
+    wait();
+}
+```
+
+汇编代码
+```
+main(){
+    move __NR_fork ,%eax
+    int 0x80 // fork就是中断系统调用,陷入内核,内核处理完毕后返回
+100:move %eax,res // 中断处理完毕后结果保存在res中赋值eax
+    cmpl res,0 // 结果跟0比较,如果是父进程,结果不为0,否则为子进程
+200:jne 208 // 执行父进程wait()
+    printf("A") // 执行子进程的代码,打印A
+    jmp 200 // 不断的打印A
+208:...
+304:wait(); //wait一旦开始执行,主进程让出,使得子进程有机会执行
+}
+```
+
+一个简单的wait示例
+
+```
+main(){
+    ....
+    wait(); // 又是mov __NR_wait int0x80
+    
+    // 系统调用函数
+    system_call:
+        call sys_waitpid
+
+    sys_waitpid(){
+        current->state = TASK_INTERRUPTIBL
+        schedule() // 开始调度....
+    }
+}
+```
+
+
+一个实际的调度函数
+
+```
+void Schedule(void){
+    while(1){
+        c = -1;
+        next = 0;
+        i = NR_TASKS;
+        p = &task[NR_TASKS];
+        // 遍历PCB数组,找到counter值最大的进程,赋值给c
+        while(--i){
+            // 如果进程是就绪状态,并且counter值大于-1
+            if((*p)->state == TASK_RUNNING && (*p)->counter > c) 
+                c=(*p)->counter,next=i;
+        }
+        if(c) break; //找到后就直接跳到switch_to执行
+        // 如果就绪的时间片都用完了(counter为0),或者所有的进程都处于阻塞状态
+        for(p = &LAST_TASK;p > &FIRST_TASK;--p)
+            // 提高阻塞IO的进程的优先级,在下一次调度的时候优先被调度
+            (*p)->counter=((*p)->counter>>1) + (*p)->priority; 
+    }
+    switch_to(next);   
+}
+```
+
+Schedule调用的时机
+
+- 当前运行的进程阻塞了
+- 时钟中断
+
+
+
+
+
+
+
 
 ## 进程同步与信号量
 
