@@ -2,7 +2,7 @@
  * @Author: lizhiyuan
  * @Date: 2020-11-21 20:53:10
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2021-03-14 17:42:13
+ * @LastEditTime: 2021-03-14 17:50:06
 -->
 # 操作系统
 
@@ -398,12 +398,17 @@ ELF数据段 ----> 虚拟内存的全局区
 
 ## 文件与IO
 
+无论是什么设备,本质上都是open/read/write/close,只是不同的设备对应着不同的设备文件(/dev/xxx)
 
+```
+int fd = open("/dev/xxx")
+for(int i=0;i<10;i++){
+    write(fd,i,sizeof(int))
+}
+close(fd)
+```
 
-
-
-
-PS: 能够将操作系统的大致逻辑弄清楚,有助于自己对运行原理的理解,剩下的,希望自己可以在看源码/创新项目中不断的打磨把...共勉!!
+我们从printf开始.....
 
 
 
