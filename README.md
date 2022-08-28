@@ -576,10 +576,65 @@ Disassembly of section __TEXT,__text:
 
 - 链接
 
+链接阶段的作用其实还是为全局的变量和函数（本地的函数和外部的函数）找到相应的地址
+
+```c
+int global_init_var = 84; // .data段确定虚拟地址后就有了地址
+int global_uninit_var; // .bss段确定虚拟地址后就有了地址
+
+void func1(int i){ // .text段
+    printf('%d\n',I);   
+}
+int main(void){ // .text段
+    static int static_var = 85;  // .data段
+    static int static_var2; // .bss段
+    int a = 1;
+    int b;
+    func1(static_var + static_var + a + b);
+    return 0;
+}
+
+在符号表中的有:
+
+main 函数(类型为1,text代码段)
+func 函数(类型为1,text代码段) 
+printf函数(类型为und)
+static静态变量(类型为Object)
+global_init_var(类型为Object)
+global_uninit_var(类型为Object)
+```
 
 
+1. 静态链接（针对那些自定义的函数，多个.c文件分别生成.o文件之后,合并成最终可执行文件，.a实质上就是一堆.o文件以及静态链接库）
 
-1. 静态链接（针对那些自定义的函数，多个.c文件分别生成.o文件之后,合并成最终可执行文件，.a实质上就是一堆.o文件）
+```
+// a.c
+extern int shared;
+int main(){
+    int a = 100;
+    swap(&a,&shared)
+}
+
+// b.c
+int shared = 1;
+void swap(int *a, int *b){
+    *a ^= *b = *a ^= *b
+}
+```
+
+（1）首先链接器会将两个文件的代码段、数据段分别进行合并,此时,代码段合并了main函数和swap函数,数据段中放入了shared变量,默认可执行文件的地址从0x0804800地址开始
+
+（2）计算各个符号的虚拟地址,因为各个符号在段中的相对位置是固定的,所以其实这时候main、shared、swap的地址已经可以确认了
+
+绝对地址修正: shared变量, 源0x000000 -> 0x3000 (实际shared变量在data段的虚拟地址)
+
+相对地址修正: swap函数, 假设swap函数被分配的虚拟地址是0x2000,
+需要被修正的位置的地址是0x1000 (main函数的虚拟地址) + 0x27 = 0x1002b ,调用swap函数的地方
+
+```
+调用地址(偏移量) = swap函数的地址（减去位置上的值？） - 下一条指令的地址（0x102b)
+```
+
 
 
 
