@@ -37,6 +37,8 @@ int a = -1
 
 对于一个有符号数的存储,我们只需要考虑将他正数的使用他的模 - 本身 （二进制取反+1）
 
+其实对于我们来讲, -1 和 + 255的效果是一样的，对吧
+
 ```
 short int a = -12345 // 有符号转无符号数
 unsigned short b = (unsigned short)a;
@@ -76,41 +78,14 @@ int b = (int)a
 
 ## 操作系统启动简略
 
-硬件上电后,操作系统在硬盘上(也有可能是在光盘中)
+1. 把bootsect.s编译成bootsect放在硬盘的第一个扇区
+2. 把setup.s编译成setup放在硬盘的2-5扇区
+3. 把剩余的全部代码(head.s作为开头)编译成system放在硬盘随后的240个扇区中
 
-我们接下来要做的事儿就是把磁盘上的代码放入内存中,将 cs:ip 的指针指向它,让计算机取指执行
+![](./image/放内存.png)
 
-BIOS 会先读取磁盘上的 0 磁道 0 扇区(1 个扇区) ----> 0x07c00 引导扇区 bootsect.s (这时候会将 07c00 的内存空间腾出来,放到 0x90000 处执行....)
 
-0x13 中断继续读磁盘中的第 2-5 个扇区(4 个扇区) ----> 0x90200(bootsect 512 个字节,0x90000 + 512 个字节 = 0x90200) setup.s
 
-setup.s 会将操作系统的代码移动到 0 地址--0x07c00 的内存地址上去
-
-最后 setup.s 会切换到保护模式,32 位(寻址)模式.跳到 0 地址去执行操作系统的代码
-
-**_总结:BIOS ----> bootsect.s ----> setup.s -----> system_**
-
-main 函数开始初始化操作系统,main 函数永不退出,永不返回....
-
-```c
-void main(void){
-    mem_init();
-    trap_init();
-    blk_dev_init();
-    chr_dev_init();
-    tty_init();
-    time_init();
-    sched_init();
-    buffer_init();
-    hd_init();
-    floppy_init();
-    sti();
-    move_to_use_mode();
-    if(!fork()){init()};
-}
-```
-
-从此以后,操作系统内核进入后台,成为中断/异常处理程序
 
 ## 中断/异常
 
