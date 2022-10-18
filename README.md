@@ -104,7 +104,12 @@ int b = (int)a
 ![](./image/放内存.png)
 
 ```
+开机后初始化指向BIOS
+BIOS来读取硬盘第一扇区的512个字节，就是对应的bootsect.s的代码
+BIOS会将代码搬运到0x7c00内存区域
 
+
+开始执行bootsect.s的代码
 mov ax,0x07c0
 mov ds,ax // 初始化数据段寄存器
 
@@ -115,22 +120,56 @@ mov cx,#256 // cx寄存器变为256 （重复256次）
 sub si,si // si寄存器清零
 sub di,di // di寄存器清零
 rep movw  // 重复执行上面的指令
-上述含义就是将0x07c0数据段的代码往后的512个字节的数据复制到0x9000的地方上去
+上述含义就是将0x07c0数据段的代码往后的512个字节的数据复制到内存0x9000的地方上去
 
-jmpi go, 0x9000 
+jmpi go, 0x90000   // 0x9000:go 去执行
 go:
-    mov ax,cs // 执行这里,cs的值是
-    mov ds,ax
+    mov ax,cs // 执行这里,cs的值是0x9000
+    mov ds,ax // 数据段寄存器为0x9000
+    mov es,ax // 
+    mov ss,ax // 栈寄存器, 0x9000 
+    mov sp,#0xFF00 // 栈顶寄存器0x9FF00
+
+load_setup:
+    mov dx,#0x0000
+    mov cx,#0x0002
+    mov bx,#0x0200
+    mov ax #0x200+4
+    int 0x13
+    jnc ok_load_setup // 成功后跳转到ok_load_setup
+    mov dx,#0x0000
+    mov ax,#0x0000
+    int 0x13
+    jmp load_setup
+// 直接说最终的作用吧，就是将硬盘的第 2 个扇区开始，把数据加载到内存 0x90200 处，共加载 4 个扇区
+
+ok_load_setup:
+    ...
+    mov ax,#0x1000
     mov es,ax
-    mov ss,ax
-    mov sp,#0xFF00
+    call read_it
+    ...
+    jmpi 0,0x90200
 
+// 从硬盘第六个扇区开始往后的240个扇区，加载到0x10000
+// 至此，操作系统的代码就从硬盘搬到内存中去了,然后bootsect.s代码执行完毕
+// 开始执行 setup.s 
 
-
-
-
+start:
+    mov ax,#0x9000
+    mov ds,ax
+    mov ah,#0x03
+    xor bh,bh
+    int 0x10
+    mov [0],dx
 
 ```
+最终的操作系统内存分布情况:
+
+![](./image//%E6%94%BE%E5%86%85%E5%AD%981.png)
+
+
+
 
 
 
